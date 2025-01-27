@@ -61,9 +61,20 @@ class randomMap extends Phaser.Scene {
         }
 
         playerVector.normalize()
-        this.player.setVelocity(this.PLAYER_VELOCITY*playerVector.x, this.PLAYER_VELOCITY*playerVector.y)
-        const playerMovement = playerVector.length() ? 'walk' : 'idle';
-        this.player.play(playerMovement + '-' + playerDirection, true);
+
+        const playerTileX = Math.floor(this.player.x / (tileSize * 0.5))
+        const playerTileY = Math.floor(this.player.y / (tileSize * 0.5))
+
+        const nextTileX = playerTileX + playerVector.x
+        const nextTileY = playerTileY + playerVector.y
+
+        if (nextTileX >= 0 && nextTileY >= 0 && this.collisionLayer[nextTileY] && this.collisionLayer[nextTileY][nextTileX] === 0) {
+            this.player.setVelocity(this.PLAYER_VELOCITY * playerVector.x, this.PLAYER_VELOCITY * playerVector.y)
+        } else {
+            this.player.setVelocity(0, 0)
+        }
+        const playerMovement = playerVector.length() ? 'walk' : 'idle'
+        this.player.play(playerMovement + '-' + playerDirection, true)
 
 
         if(Phaser.Input.Keyboard.JustDown(this.reload)) {
@@ -99,11 +110,13 @@ class randomMap extends Phaser.Scene {
         const base = []
         const decor = []
         const water = []
-        
+        this.collisionLayer = []
+
         for(let x = 0; x < 15; x++){
             const baseRow = []
             const decorRow = []
             const waterRow = []
+            const collisionRow = []
             for(let y = 0; y < 20; y++){
                 const noiseValue = this.noiseGen(x, y)
                 // baseRow.push(36)
@@ -118,6 +131,8 @@ class randomMap extends Phaser.Scene {
                 }
 
                 baseRow.push(baseTileIndex)
+
+                collisionRow.push(baseTileIndex === 203 ? 1 : 0)
 
                 let decorTileIndex = -1
                 if (baseTileIndex === 18 && Math.random() < 0.1) {
@@ -144,12 +159,14 @@ class randomMap extends Phaser.Scene {
             water.push(waterRow)
             base.push(baseRow)
             decor.push(decorRow)
+            this.collisionLayer.push(collisionRow)
         }
         const transitionMap = this.applyTransition(base)
 
         if(this.player) this.player.destroy()
         console.log(base)
         console.log(decor)
+        console.log(this.collisionLayer)
 
         const watermap = this.make.tilemap({
             data: water,
@@ -181,12 +198,19 @@ class randomMap extends Phaser.Scene {
     }
 
     createPlayer(){
-        let playerX = this.player ? this.player.x : 64;
-        let playerY = this.player ? this.player.y : 64;
+        let spawnX, spawnY
+        do {
+            spawnX = Phaser.Math.Between(0, this.mapWidth - 1)
+            spawnY = Phaser.Math.Between(0, this.mapHeight - 1)
+        } while (this.collisionLayer[spawnY][spawnX] === 1)
+
+        const playerX = spawnX * tileSize * 0.5 
+        const playerY = spawnY * tileSize * 0.5
 
         this.player = this.physics.add.sprite(playerX, playerY, 'char', 1).setScale(1)
         this.player.body.setCollideWorldBounds(true)
         this.player.body.setSize(32, 32).setOffset(8, 16)
+
     }
 
     createPlayerAnimations(){
